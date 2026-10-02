@@ -45,4 +45,4 @@ CI runs typecheck, tests, and build on every PR.
 
 ## Testing without the secret key
 
-Cloud sessions don't have `SUPABASE_SECRET_KEY`, and their network policy may block `*.vercel.app`. To exercise the UI locally, point `SUPABASE_URL` at a small fake PostgREST server seeded from the CSVs and drive it with Playwright (Chromium is at `/opt/pw-browsers`).
+Cloud sessions don't have `SUPABASE_SECRET_KEY`, and their network policy may block `*.vercel.app`. To exercise the UI locally, point `SUPABASE_URL` at a small fake PostgREST server seeded from the CSVs, set `SUPABASE_SECRET_KEY` to any non-empty dummy value (the client requires one), and drive it with Playwright (Chromium is at `/opt/pw-browsers`).
