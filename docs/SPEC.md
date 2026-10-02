@@ -205,8 +205,8 @@ always visible (for example a bottom tab bar), plus a login screen.
 ### Keeping officials in sync
 
 With 2 or 3 officials on separate phones, data refreshes when a screen
-regains focus (React Router revalidation). Stretch goal: Supabase Realtime
-updates so standings change live on every device.
+regains focus and every 15 seconds while it's visible (React Router
+revalidation).
 
 ---
 
