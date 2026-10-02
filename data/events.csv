@@ -1,0 +1,15 @@
+position,name,kind,red,yellow,blue,green
+1,Cornhole,standard,Avery,Blake,Casey,Dakota
+2,Egg Toss,standard,Emerson,Finley,Gray,Harper
+3,Trivia,standard,Indigo,Jordan,Kai,Logan
+4,Pictionary,standard,Morgan,Noel,Oakley,Parker
+5,Sack Race,standard,Quinn,Reese,Sage,Taylor
+6,Charades,standard,Uma,Val,Wren,Xander
+7,Beer Pong,standard,Yael,Zion,Avery,Blake
+8,Musical Chairs,standard,Casey,Dakota,Emerson,Finley
+9,Hula Hoop,standard,Gray,Harper,Indigo,Jordan
+10,Limbo,standard,Kai,Logan,Morgan,Noel
+11,Ring Toss,standard,Oakley,Parker,Quinn,Reese
+12,Dizzy Bat,standard,Sage,Taylor,Uma,Val
+13,Tug of War,bonus,,,,
+14,Relay Race,bonus,,,,
