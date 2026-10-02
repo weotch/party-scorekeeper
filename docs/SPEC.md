@@ -13,8 +13,8 @@ Status: **Draft**. Open questions are listed at the end.
 - About **20 to 30 players**.
 - About **12 standard events** plus **1 or 2 bonus events** at the end, run in a
   fixed order that's decided ahead of time.
-- There are 4 team colors, fixed for the whole party: **Red, Yellow, Blue,
-  Green**. Colored props match them.
+- Standard events use 4 team colors, fixed for the whole party: **Red,
+  Yellow, Blue, Green**. Colored props match them.
 - Every player belongs to exactly one team in every event. No one sits out.
 
 ### Standard events (4 teams)
@@ -28,7 +28,8 @@ Status: **Draft**. Open questions are listed at the end.
 
 ### Bonus events (2 teams)
 
-- The whole group splits into 2 teams as evenly as possible. There is no
+- The whole group is randomly split into **Team A** and **Team B** as evenly
+  as possible (assigned in advance, like supporters). No colors and no
   designated competitor.
 - The winning team's members each get **5 points**. The losing team gets 0.
 
@@ -36,7 +37,9 @@ Status: **Draft**. Open questions are listed at the end.
 
 - Officials can give two or more teams the same place.
 - Places below a tie **move up** (dense ranking). There are no gaps; the last
-  places just disappear.
+  places just disappear. The official picks those places by hand (the app
+  doesn't renumber anything), and points always come straight from the place
+  that was picked.
   - Two tied for 1st: places 1, 1, 2, 3, so points 5, 5, 3, 2.
   - Two tied for 2nd: places 1, 2, 2, 3, so points 5, 3, 3, 2.
 
@@ -54,6 +57,8 @@ Status: **Draft**. Open questions are listed at the end.
 - Running more than one party (designed for this party only).
 - Randomizing assignments live. Assignments are generated and stored ahead of
   time so the printed sheets always match the app.
+- Printing. The organizer makes the printed sheets outside the app.
+- Showing supporters in the app. They're on the printed sheets.
 
 ---
 
@@ -63,8 +68,8 @@ All party configuration lives in the database. Nothing about players, events,
 or assignments is hardcoded.
 
 ```sql
--- Fixed set of team colors
-create type team_color as enum ('red', 'yellow', 'blue', 'green');
+-- Team keys: 4 colors for standard events, A/B for bonus events
+create type team_key as enum ('red', 'yellow', 'blue', 'green', 'a', 'b');
 
 create table players (
   id         uuid primary key default gen_random_uuid(),
@@ -84,26 +89,27 @@ create table events (
 );
 
 -- One row per team in an event. Holds the result.
+-- Standard events use red/yellow/blue/green, bonus events use a/b.
 create table event_teams (
   event_id uuid not null references events(id) on delete cascade,
-  color    team_color not null,
+  team     team_key   not null,
   place    int check (place >= 1),          -- null until results are entered
-  primary key (event_id, color)
+  primary key (event_id, team)
 );
 
 -- One row per player per event: which team they're on and their role.
 create table event_members (
   event_id  uuid not null,
   player_id uuid not null references players(id) on delete cascade,
-  color     team_color not null,
+  team      team_key   not null,
   role      text not null check (role in ('competitor', 'supporter')),
   primary key (event_id, player_id),        -- a player is on exactly one team per event
-  foreign key (event_id, color) references event_teams(event_id, color) on delete cascade
+  foreign key (event_id, team) references event_teams(event_id, team) on delete cascade
 );
 
 -- At most one competitor per team
 create unique index one_competitor_per_team
-  on event_members (event_id, color) where role = 'competitor';
+  on event_members (event_id, team) where role = 'competitor';
 ```
 
 Notes:
@@ -112,20 +118,23 @@ Notes:
   place. No separate status column to keep in sync.
 - **Points aren't stored.** They're derived as `events.points[place]` (0 if
   out of range). Correcting a result automatically fixes every player's total.
-- **Bonus events** have 2 `event_teams` rows and no competitor members.
+- **Bonus events** have 2 `event_teams` rows (`a` and `b`) and no competitor
+  members.
 - Scoring math lives in one place: a pure, unit-tested TypeScript function.
   With about 30 players and 14 events the whole dataset is a few hundred rows,
   so loaders fetch the raw rows and compute totals in code.
 
 ### Data validation
 
-A setup check (a script and/or an in-app page) reports:
+A setup check (run by the import script) reports:
 
 - A player missing from an event, or listed twice.
-- A standard event without exactly 4 teams and 4 competitors.
-- A bonus event without exactly 2 teams.
+- A standard event without exactly 4 color teams and 4 competitors.
+- A bonus event without exactly teams A and B.
 - Team sizes that differ by more than 1 within an event.
-- Results with gaps in the places (for example 1, 3, 4).
+- Results with gaps in the places (for example 1, 3, 4). Shown as a gentle
+  warning in the app rather than blocking anything, since results are saved
+  one tap at a time.
 
 ---
 
@@ -134,7 +143,7 @@ A setup check (a script and/or an in-app page) reports:
 Since assignments are generated once and printed, seeding is a **one-time,
 deterministic** script, not an app feature.
 
-**Inputs** (files checked into `data/`, or edited in the Supabase table editor):
+**Inputs** (CSV files in `data/`, imported by a script):
 
 - `players.csv`: one name per row.
 - `events.csv`: position, name, kind, and for standard events the competitor
@@ -146,7 +155,8 @@ deterministic** script, not an app feature.
 2. For each standard event, puts the 4 competitors on their colors, then
    shuffles the remaining players and deals them round-robin across the 4
    colors (as even as possible).
-3. For each bonus event, shuffles everyone and splits them across 2 colors.
+3. For each bonus event, shuffles everyone and splits them into Team A and
+   Team B.
 4. Uses a **fixed random seed** so a rerun produces the same assignments.
 5. **Refuses to overwrite** existing assignments unless passed `--force`, so
    the printed sheets can't drift from the database by accident.
@@ -159,32 +169,44 @@ same competitor's team over and over, so the mix of teammates changes.
 
 ## 4. Screens
 
-Mobile-first, big tap targets, team colors used heavily so they match the
-props.
+Mobile-first with big tap targets. Two views, switched with a toggle that's
+always visible (for example a bottom tab bar), plus a login screen.
 
 | Route | Purpose |
 | --- | --- |
-| `/login` | Official sign-in. |
-| `/` | **Schedule.** Ordered event list showing status (upcoming / done) and the winning color for finished events. The next event is highlighted. |
-| `/events/:position` | **Event.** One card per color showing the competitor (big) and supporters. Enter or edit results here. Previous/next links to move through the night. |
-| `/leaderboard` | **Standings.** All players ranked by total, with ties sharing a rank. Tap a player to see their breakdown. |
-| `/players/:id` | **Player breakdown.** Per event: color, role, place, points. |
-| `/print` | **Printable sheets.** One page per event with the team breakdown by color, styled for paper. Generated from the same data the app uses. |
-| `/setup-check` | Shows the validation report from section 2. |
+| `/login` | Shared password entry. |
+| `/events/:position` | **Event view (main screen).** Steps through events in order with previous/next controls. `/` redirects to the first event that doesn't have full results yet. |
+| `/leaderboard` | **Leaderboard.** All players ranked by total points, with ties sharing a rank. |
 
-### Entering results
+### Event view
 
-- Each color card has place buttons (1st to 4th, or 1st/2nd for bonus events).
-- Ties are allowed: two cards can both pick 1st.
-- Before saving, the app checks the places are dense (no gaps) and shows a
-  points preview, for example "Red +5 (7 players)".
-- Saving writes `event_teams.place`. Results can be edited or cleared later.
+- Header: event number, name, and previous/next arrows.
+- Standard event: 4 rows, one per color (Red, Yellow, Blue, Green), each
+  showing the color and that event's competitor.
+- Bonus event: 2 rows, Team A and Team B.
+- Each row has a button for every place: 1st to 4th for standard events, 1st
+  and 2nd for bonus events. The selected place is highlighted.
+- **Tapping a place saves it right away.** There's no confirm step.
+  - Tapping a different place on the same row changes it.
+  - Tapping the selected place again clears it.
+  - Two rows can pick the same place (ties).
+- **Optimistic updates.** The button highlights right away while the save
+  runs in the background. If the save fails, the row snaps back to its
+  previous value and a short error message appears.
+- If the places have a gap (for example 1, 1, 3), a small warning appears.
+  It never blocks anything.
+
+### Leaderboard
+
+- Rank, name, and total points, sorted highest first.
+- Ties share a rank (for example 1, 2, 2, 4).
+- Possible addition: tap a player to see per-event points. Not required.
 
 ### Keeping officials in sync
 
-With 2 or 3 officials on separate phones, the app should refresh data when a
-screen regains focus. Stretch goal: Supabase Realtime subscriptions on
-`event_teams` so standings update live on everyone's device.
+With 2 or 3 officials on separate phones, data refreshes when a screen
+regains focus (React Router revalidation). Stretch goal: Supabase Realtime
+updates so standings change live on every device.
 
 ---
 
@@ -195,17 +217,29 @@ screen regains focus. Stretch goal: Supabase Realtime subscriptions on
 - **Vercel** hosting via the `@vercel/react-router` preset.
 - **Supabase** Postgres, with migrations in `supabase/migrations` (Supabase
   CLI) and `@supabase/ssr` for server-side access.
-- **Tailwind CSS** for styling, plus print styles for `/print`.
+- **Tailwind CSS** for styling.
 - **Vitest** for unit tests on scoring, tie handling, and assignment dealing.
+- Optimistic updates use React Router's `useFetcher`: while a save is in
+  flight the UI shows the submitted value, and when it settles the loader
+  data (the real database state) takes over. A failed save rolls back on its
+  own.
 
 ### Auth and security
 
-- Officials sign in with **Supabase Auth (email and password)**. You create
-  their accounts by hand in the Supabase dashboard; there's no public sign-up.
-- Row Level Security: authenticated users can read and write everything;
-  anonymous users get nothing.
-- Secrets (Supabase URL, keys) go in Vercel environment variables. The service
-  role key is used only by the local seed script, never in the deployed app.
+Kept deliberately small:
+
+- One **shared password**, stored as a Vercel environment variable.
+- `/login` checks it in a React Router action and sets a signed, HTTP-only
+  session cookie (`createCookieSessionStorage`). Every other route's loader
+  and action checks for that cookie and redirects to `/login` if it's
+  missing. This is roughly 30 lines of code.
+- The app only talks to Supabase from the server, using the Supabase secret
+  key. Row Level Security is turned on with no policies, so the public
+  (anon) key can't read or write anything.
+- Why not Google sign-in: Supabase supports it, but it means setting up a
+  Google Cloud OAuth client, redirect URLs, and an allowlist check. That's
+  more setup and code than a shared password for 3 trusted people. Vercel's
+  built-in password protection is a paid add-on.
 
 ---
 
@@ -214,27 +248,22 @@ screen regains focus. Stretch goal: Supabase Realtime subscriptions on
 Target: feature complete with time for a dry run before October 11.
 
 1. **Foundation.** Scaffold React Router + Tailwind, write the Supabase
-   migration, and set up deploys to Vercel with environment variables. Add
-   the scoring module and its tests.
-2. **Seeding.** CSV format, seed script with seeded shuffle, setup check. Load
-   placeholder data.
-3. **Core screens.** Schedule, event view, results entry, leaderboard, player
-   breakdown.
-4. **Auth and print.** Login, RLS policies, `/print` sheets.
-5. **Polish.** Refresh on focus (Realtime if time allows), loading and error
-   states, testing on real phones.
-6. **Real data and dry run.** Load the real roster and schedule, print the
-   sheets, and run a mock party with the officials.
+   migration, set up Vercel deploys with environment variables. Add the
+   scoring module and its tests.
+2. **CSV import.** CSV format, import script with seeded shuffle, setup
+   check. Load placeholder data.
+3. **Event view.** Event stepping, place buttons with optimistic saves and
+   rollback, gap warning.
+4. **Leaderboard and auth.** Leaderboard view, tab toggle, shared password
+   login.
+5. **Polish.** Refresh on focus (Realtime if time allows), error states,
+   testing on real phones.
+6. **Real data and dry run.** Import the real roster and schedule, and run a
+   mock party with the officials.
 
 ---
 
 ## 7. Open questions
 
-1. **Bonus event colors.** Which 2 colors do bonus teams use? Is the split
-   random and seeded in advance like supporters?
-2. **Bonus losers.** Confirm the losing team gets 0 points.
-3. **Auth.** Is per-official email and password OK, or would you rather share
-   one passcode among the officials?
-4. **Print sheets.** Should the app generate the printed sheets (`/print`), or
-   will you make your own from the data?
-5. **Accounts.** Do the Supabase and Vercel projects exist yet?
+1. **Accounts.** The Supabase and Vercel projects still need to be created
+   and connected.
