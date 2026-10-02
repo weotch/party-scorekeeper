@@ -1,6 +1,6 @@
 import { Form } from "react-router";
 import { requireOfficial } from "~/lib/session.server";
-import { supabase } from "~/lib/supabase.server";
+import { db } from "~/lib/supabase.server";
 import type { Route } from "./+types/home";
 
 export const meta: Route.MetaFunction = () => [{ title: "Party Scorekeeper" }];
@@ -10,11 +10,11 @@ export const meta: Route.MetaFunction = () => [{ title: "Party Scorekeeper" }];
 export async function loader({ request }: Route.LoaderArgs) {
   await requireOfficial(request);
   const [players, events] = await Promise.all([
-    supabase.from("players").select("*", { count: "exact", head: true }),
-    supabase.from("events").select("*", { count: "exact", head: true }),
+    db().from("players").select("*", { count: "exact", head: true }),
+    db().from("events").select("*", { count: "exact", head: true }),
   ]);
-  if (players.error) throw players.error;
-  if (events.error) throw events.error;
+  const error = players.error ?? events.error;
+  if (error) throw new Error(`Database error: ${error.message || error.code}`);
   return { players: players.count ?? 0, events: events.count ?? 0 };
 }
 
