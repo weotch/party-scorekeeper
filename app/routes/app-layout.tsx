@@ -33,7 +33,7 @@ export default function AppLayout() {
       <div className="mx-auto min-h-dvh max-w-md px-4 pb-28">
         <Outlet />
       </div>
-      <nav className="fixed inset-x-0 bottom-0 border-t border-gray-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-gray-800 dark:bg-gray-950/95">
+      <nav className="fixed inset-x-0 bottom-0 border-t border-neon-cyan/40 bg-void/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_rgb(0_240_255/0.12)] backdrop-blur">
         <div className="mx-auto grid max-w-md grid-cols-2">
           <Tab to="/" label="Events" />
           <Tab to="/leaderboard" label="Leaderboard" />
@@ -50,10 +50,10 @@ function Tab({ to, label }: { to: string; label: string }) {
       to={to}
       // "Events" stays highlighted on /events/:position
       className={({ isActive }) =>
-        `py-4 text-center text-base font-semibold ${
+        `py-4 text-center font-display text-sm font-bold uppercase tracking-[0.2em] ${
           isActive || (to === "/" && pathname.startsWith("/events"))
-            ? "text-gray-950 dark:text-white"
-            : "text-gray-400"
+            ? "text-neon-cyan text-glow"
+            : "text-dim"
         }`
       }
     >

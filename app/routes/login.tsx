@@ -20,26 +20,31 @@ export default function Login({ actionData }: Route.ComponentProps) {
   const submitting = useNavigation().state === "submitting";
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
-      <h1 className="text-center text-3xl font-bold">Party Scorekeeper</h1>
+      <div className="text-center">
+        <p className="font-mono text-xs uppercase tracking-[0.3em] text-neon-pink">// Officials only</p>
+        <h1 className="mt-2 font-display text-3xl font-black uppercase leading-tight tracking-wide text-neon-cyan text-glow">
+          Party Scorekeeper
+        </h1>
+      </div>
       <Form method="post" className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm font-medium">
-          Password
+        <label className="flex flex-col gap-1 font-mono text-xs uppercase tracking-widest text-dim">
+          Access code
           <input
             type="password"
             name="password"
             autoComplete="current-password"
             required
             autoFocus
-            className="rounded-lg border border-gray-300 px-3 py-3 text-base dark:border-gray-700 dark:bg-gray-900"
+            className="clip-corner-sm border border-neon-cyan/50 bg-panel px-3 py-3 font-mono text-base text-neon-cyan outline-none focus:border-neon-cyan focus:shadow-[0_0_14px_rgb(0_240_255/0.35)]"
           />
         </label>
-        {actionData?.error && <p className="text-sm text-red-600">{actionData.error}</p>}
+        {actionData?.error && <p className="font-mono text-sm text-neon-red">! {actionData.error}</p>}
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-lg bg-gray-900 py-3 text-base font-semibold text-white disabled:opacity-60 dark:bg-white dark:text-gray-900"
+          className="clip-corner-sm bg-neon-pink py-3 font-display text-sm font-bold uppercase tracking-widest text-void shadow-[0_0_18px_rgb(255_43_214/0.5)] disabled:opacity-60"
         >
-          {submitting ? "Signing in…" : "Sign in"}
+          {submitting ? "Connecting…" : "Jack in"}
         </button>
       </Form>
     </main>

@@ -1,15 +1,62 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Orbitron", "Rajdhani", ui-sans-serif, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, monospace;
+
+  --color-void: #07060d;
+  --color-panel: #110e1f;
+  --color-panel-2: #1b1630;
+  --color-line: #2c2550;
+  --color-dim: #8b84b8;
+  --color-neon-cyan: #00f0ff;
+  --color-neon-pink: #ff2bd6;
+  --color-neon-yellow: #fcee0a;
+  --color-neon-red: #ff3b5c;
+  --color-neon-blue: #3d7bff;
+  --color-neon-green: #39ff8f;
 }
 
 html,
 body {
-  @apply bg-white dark:bg-gray-950;
+  color-scheme: dark;
+  @apply bg-void font-sans text-gray-100;
+}
 
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
-  }
+body {
+  /* Faint grid plus a magenta/cyan haze at the edges */
+  background-image:
+    radial-gradient(ellipse at top, rgb(255 43 214 / 0.14), transparent 60%),
+    radial-gradient(ellipse at bottom, rgb(0 240 255 / 0.1), transparent 60%),
+    linear-gradient(rgb(0 240 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(0 240 255 / 0.05) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  background-attachment: fixed;
+}
+
+/* CRT scanlines over everything, ignored by taps */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background: repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.1) 0 1px, transparent 1px 3px);
+}
+
+/* Cut-corner panels and buttons */
+@utility clip-corner {
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+}
+@utility clip-corner-sm {
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+
+@utility text-glow {
+  text-shadow: 0 0 6px currentColor, 0 0 18px color-mix(in srgb, currentColor 55%, transparent);
+}
+
+@utility glitch {
+  text-shadow: 2px 0 var(--color-neon-pink), -2px 0 var(--color-neon-cyan);
 }

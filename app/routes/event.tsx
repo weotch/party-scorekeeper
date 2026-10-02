@@ -93,17 +93,19 @@ export default function EventPage({ loaderData }: Route.ComponentProps) {
       <header className="flex items-center gap-2">
         <NavArrow to={prev} label="Previous event" direction="prev" />
         <div className="flex-1 text-center">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Event {number} of {total}
-            {event.kind === "bonus" && " · Bonus"}
+          <p className="font-mono text-xs uppercase tracking-widest text-neon-pink">
+            // EVENT {String(number).padStart(2, "0")}/{String(total).padStart(2, "0")}
+            {event.kind === "bonus" && " · BONUS"}
           </p>
-          <h1 className="text-2xl font-bold leading-tight">{event.name}</h1>
+          <h1 className="mt-1 font-display text-2xl font-black uppercase leading-tight tracking-wide text-neon-cyan text-glow">
+            {event.name}
+          </h1>
         </div>
         <NavArrow to={next} label="Next event" direction="next" />
       </header>
 
       {event.kind === "bonus" && (
-        <p className="text-center text-sm text-gray-500">Everyone on the winning team gets 5 points.</p>
+        <p className="text-center font-mono text-sm text-neon-yellow">Everyone on the winning team gets 5 points.</p>
       )}
 
       <ul className="flex flex-col gap-3">
@@ -121,7 +123,7 @@ export default function EventPage({ loaderData }: Route.ComponentProps) {
       </ul>
 
       {gap && (
-        <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+        <p className="clip-corner-sm border-l-4 border-neon-yellow bg-neon-yellow/10 px-3 py-2 font-mono text-sm text-neon-yellow">
           Heads up: a place is skipped. After a tie, the next team should take the next place
           (for example 1st, 1st, 2nd).
         </p>
@@ -150,21 +152,21 @@ function TeamRow({
   const error = fetcher.state === "idle" ? fetcher.data?.error : undefined;
 
   return (
-    <li className={`rounded-xl border-2 ${style.ring} p-3`}>
+    <li className={`clip-corner border ${style.ring} bg-panel/85 p-3 backdrop-blur-sm`}>
       <div className="mb-3 flex items-center gap-3">
-        <span className={`h-8 w-8 shrink-0 rounded-full ${style.swatch}`} aria-hidden />
+        <span className={`h-8 w-2 shrink-0 ${style.swatch}`} aria-hidden />
         <div className="min-w-0 flex-1">
           {competitor ? (
             <>
-              <p className="truncate text-lg font-semibold leading-tight">{competitor}</p>
-              <p className="text-xs text-gray-500">{style.label}</p>
+              <p className="truncate text-xl font-bold leading-tight">{competitor}</p>
+              <p className="font-mono text-xs uppercase tracking-widest text-dim">{style.label}</p>
             </>
           ) : (
-            <p className="text-lg font-semibold">{style.label}</p>
+            <p className="text-xl font-bold uppercase tracking-wide">{style.label}</p>
           )}
         </div>
         {place !== null && (
-          <span className="text-sm font-semibold tabular-nums text-gray-600 dark:text-gray-300">
+          <span className="font-mono text-lg tabular-nums text-neon-green text-glow">
             +{points}
           </span>
         )}
@@ -185,10 +187,10 @@ function TeamRow({
                   { method: "post" },
                 )
               }
-              className={`rounded-lg py-3 text-base font-semibold transition-colors ${
+              className={`clip-corner-sm py-3 font-display text-sm font-bold uppercase transition-colors ${
                 selected
                   ? style.selected
-                  : "bg-gray-100 text-gray-800 active:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:active:bg-gray-700"
+                  : "bg-panel-2 text-gray-300 active:bg-line"
               }`}
             >
               {ordinal(n)}
@@ -197,17 +199,17 @@ function TeamRow({
         })}
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-2 font-mono text-sm text-neon-red">! {error}</p>}
     </li>
   );
 }
 
 function NavArrow({ to, label, direction }: { to: number | null; label: string; direction: "prev" | "next" }) {
-  const className = "flex h-12 w-12 items-center justify-center rounded-full text-2xl";
+  const className = "clip-corner-sm flex h-12 w-12 items-center justify-center font-display text-2xl";
   const arrow = direction === "prev" ? "‹" : "›";
   if (to === null) {
     return (
-      <span className={`${className} text-gray-300 dark:text-gray-700`} aria-hidden>
+      <span className={`${className} text-line`} aria-hidden>
         {arrow}
       </span>
     );
@@ -216,7 +218,7 @@ function NavArrow({ to, label, direction }: { to: number | null; label: string; 
     <Link
       to={`/events/${to}`}
       aria-label={label}
-      className={`${className} bg-gray-100 active:bg-gray-200 dark:bg-gray-800 dark:active:bg-gray-700`}
+      className={`${className} bg-neon-cyan/10 text-neon-cyan ring-1 ring-neon-cyan/50 ring-inset active:bg-neon-cyan/25`}
     >
       {arrow}
     </Link>
