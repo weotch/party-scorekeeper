@@ -1,15 +1,13 @@
-position,name,kind,red,yellow,blue,green
-1,Cornhole,standard,Avery,Blake,Casey,Dakota
-2,Egg Toss,standard,Emerson,Finley,Gray,Harper
-3,Trivia,standard,Indigo,Jordan,Kai,Logan
-4,Pictionary,standard,Morgan,Noel,Oakley,Parker
-5,Sack Race,standard,Quinn,Reese,Sage,Taylor
-6,Charades,standard,Uma,Val,Wren,Xander
-7,Beer Pong,standard,Yael,Zion,Avery,Blake
-8,Musical Chairs,standard,Casey,Dakota,Emerson,Finley
-9,Hula Hoop,standard,Gray,Harper,Indigo,Jordan
-10,Limbo,standard,Kai,Logan,Morgan,Noel
-11,Ring Toss,standard,Oakley,Parker,Quinn,Reese
-12,Dizzy Bat,standard,Sage,Taylor,Uma,Val
-13,Tug of War,bonus,,,,
-14,Relay Race,bonus,,,,
+position,name,description
+1,Balloon Bobble,"Keep a balloon aloft, but you lose the use of a limb as time elapses."
+2,Hot Potato Tag,"Tag where the ""it"" player is eliminated when time is up until only one remains."
+3,Cookie Monster,"Without using your hands, get OREOs from your forehead into your mouth."
+4,Junk in the Trunk,Shake your booty to dislodge ping pong balls from a container tied to your backside.
+5,Tallest Tower,Stack foam blocks as high as you can in the allotted time.
+6,Banana Belt Bowling,Knock pins over using a banana that's dangling from your waist.
+7,Try not to Laugh,Don't spit water out of your mouth while listening to ridiculous audio tracks.
+8,Dizzy Dash,Spin round and round and then sprint through several checkpoints.
+9,Speed Mölkky,Think cornhole mixed with bowling plus an umlaut.
+10,Hidden Labyrinth,Complete a maze (on paper) with the fewest wall collisions.
+11,Card Ninja,Embed playing cards into a halved watermelon with the power of your wrist.
+12,Balloon Hustle,Choose a partner and then be the first to cross the finish line while holding a balloon between your foreheads.

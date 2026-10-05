@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, Outlet, useLocation, useRevalidator } from "react-router";
+import { skipOnSearchOnlyChange } from "~/lib/revalidate";
 import { requireOfficial } from "~/lib/session.server";
 import type { Route } from "./+types/app-layout";
 
@@ -7,6 +8,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireOfficial(request);
   return null;
 }
+
+/** The sign-in check doesn't depend on the query string, so heat tabs can switch without a round trip. */
+export const shouldRevalidate = skipOnSearchOnlyChange;
 
 /** Keeps every official's screen current: refresh on return to the tab and every 15s while visible. */
 function useAutoRefresh() {
