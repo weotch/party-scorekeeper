@@ -50,7 +50,7 @@ insert into events (position, name, description, points) values
   (9, 'Speed Mölkky', 'Think cornhole mixed with bowling plus an umlaut.', '{5,3,2,1}'),
   (10, 'Hidden Labyrinth', 'Complete a maze (on paper) with the fewest wall collisions.', '{5,3,2,1}'),
   (11, 'Card Ninja', 'Embed playing cards into a halved watermelon with the power of your wrist.', '{5,3,2,1}'),
-  (12, 'Balloon Hustle', 'Choose a partner and then be the first to the finish the line while holding a balloon between your foreheads.', '{5,3,2,1}');
+  (12, 'Balloon Hustle', 'Choose a partner and then be the first to cross the finish line while holding a balloon between your foreheads.', '{5,3,2,1}');
 
 insert into heats (event_id, number)
 select e.id, v.heat

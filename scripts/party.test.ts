@@ -56,13 +56,12 @@ describe("buildParty", () => {
     expect(edited.assignments.get(2)).toEqual(first.assignments.get(2));
   });
 
-  it("warns about uneven teams and oversized teams without failing", () => {
+  it("warns about uneven teams without failing", () => {
     const { party, warnings } = build({
-      heatsCsv: heatsCsv.replace("P9;P10;P11,P12;P13;P14", "P9;P10;P11;P21,P12;P13;P14"),
+      heatsCsv: heatsCsv.replace("P9;P10;P11,P12;P13;P14", "P9;P10;P11,P12;P13"),
     });
     expect(party).not.toBeNull();
-    expect(warnings.join("\n")).toMatch(/Hot Potato Tag, heat 1: red has 4 people/);
-    expect(warnings.join("\n")).toMatch(/Hot Potato Tag, heat 1: uneven teams/);
+    expect(warnings.join("\n")).toMatch(/Hot Potato Tag, heat 1: uneven teams \(red 3, yellow 2, blue 3, green 3\)/);
   });
 
   it.each([
@@ -73,6 +72,10 @@ describe("buildParty", () => {
     ["a repeated heat number", { heatsCsv: heatsCsv.replace("Balloon Bobble,2", "Balloon Bobble,1") }, /heat 1 appears twice/],
     ["a missing color", { heatsCsv: heatsCsv.replace("P1,P2,P3,P4", "P1,P2,P3,") }, /no green competitor/],
     ["someone competing twice in a game", { heatsCsv: heatsCsv.replace("P5,P6", "P1,P6") }, /P1 is listed more than once/],
+    ["more than three people on a color", { heatsCsv: heatsCsv.replace("P9;P10;P11,P12", "P9;P10;P11;P21,P12") }, /red has 4 people; the most per color is 3/],
+    ["no players", { playersCsv: "name\n" }, /players.csv has no players/],
+    ["no games", { eventsCsv: "position,name,description\n", heatsCsv: "event,heat,red,yellow,blue,green\n" }, /events.csv has no games/],
+    ["completely empty files", { playersCsv: "", eventsCsv: "", heatsCsv: "" }, /no players[\s\S]*no games/],
     ["a duplicate position", { eventsCsv: eventsCsv.replace("2,Hot", "1,Hot") }, /position 1 is used twice/],
   ])("rejects %s", (_label, overrides, message) => {
     const { party, errors } = build(overrides);

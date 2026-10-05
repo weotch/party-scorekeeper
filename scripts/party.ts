@@ -30,7 +30,7 @@ export interface PartyInput {
   seed: string;
 }
 
-/** Most names that fit comfortably on a team card. More still works, with a warning. */
+/** Most people a color can field in one heat. The team cards are designed for this many names. */
 const MAX_PER_TEAM = 3;
 
 /**
@@ -44,6 +44,7 @@ export function buildParty({ playersCsv, eventsCsv, heatsCsv, seed }: PartyInput
 
   const players = parseCsv(playersCsv).map((r) => r.name);
   const playerSet = new Set(players);
+  if (players.length === 0) errors.push("players.csv has no players");
   if (players.some((p) => !p)) errors.push("players.csv has a blank name");
   if (playerSet.size !== players.length) {
     const dupes = players.filter((p, i) => players.indexOf(p) !== i);
@@ -66,6 +67,8 @@ export function buildParty({ playersCsv, eventsCsv, heatsCsv, seed }: PartyInput
     if (eventsByName.has(key)) errors.push(`${line}: "${row.name}" appears twice`);
     eventsByName.set(key, { position, name: row.name, description: row.description ?? "", heats: [] });
   }
+
+  if (eventsByName.size === 0) errors.push("events.csv has no games");
 
   // Collect heats per game, keyed by heat number, before checking they are contiguous.
   const heatsByEvent = new Map<string, Map<number, HeatLineup>>();
@@ -103,8 +106,8 @@ export function buildParty({ playersCsv, eventsCsv, heatsCsv, seed }: PartyInput
         }
       }
       if (lineup[team].length > MAX_PER_TEAM) {
-        warnings.push(
-          `${event.name}, heat ${number}: ${team} has ${lineup[team].length} people (cards are designed for up to ${MAX_PER_TEAM})`,
+        errors.push(
+          `${line} (${event.name}, heat ${number}): ${team} has ${lineup[team].length} people; the most per color is ${MAX_PER_TEAM}`,
         );
       }
     }

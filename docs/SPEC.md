@@ -16,7 +16,7 @@ assignments on printed sheets.
 
 - A game has one or more **heats**. In a heat, the four colors compete and are
   ranked 1st to 4th. Balloon Bobble runs 2 heats.
-- Each color fields one or more people in a heat. Usually that is one person;
+- Each color fields one to three people in a heat. Usually that is one person;
   Hot Potato Tag fields 3 per color in a single heat, and Balloon Hustle fields
   a pre-assigned pair per color. A competitor plays in exactly one heat of a
   game.
@@ -89,8 +89,10 @@ and writes `data/import.sql`. It checks that:
 - Every name exists, and nobody competes twice in a game.
 - Every heat has at least one competitor for each color, and heat numbers run
   1, 2, 3 with none missing.
-- Every game has at least one heat, and game names and positions are unique.
-- (Warnings only) a heat has uneven teams or more than 3 people on a color.
+- No color has more than 3 people in a heat.
+- Every game has at least one heat, there is at least one player and one game,
+  and game names and positions are unique.
+- (Warning only) a heat has uneven teams.
 
 Dealing is seeded, and **each game is dealt from its own seed** (the seed plus
 the game's name). Reordering games or editing one game's lineup never changes
