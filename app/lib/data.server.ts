@@ -1,27 +1,12 @@
 import { db } from "./supabase.server";
-import type { EventKind, Role, TeamKey } from "./scoring";
+import type { ScoringMember, ScoringPlayer, ScoringResult, TeamKey } from "./scoring";
 
 export interface EventRow {
   id: string;
   position: number;
   name: string;
-  kind: EventKind;
+  description: string | null;
   points: number[];
-}
-export interface TeamRow {
-  event_id: string;
-  team: TeamKey;
-  place: number | null;
-}
-export interface MemberRow {
-  event_id: string;
-  player_id: string;
-  team: TeamKey;
-  role: Role;
-}
-export interface PlayerRow {
-  id: string;
-  name: string;
 }
 
 /** Unwraps a Supabase result, turning errors into real Errors for the error boundary. */
@@ -32,47 +17,51 @@ function unwrap<T>(result: { data: T | null; error: { message: string; code?: st
 
 export async function getEvents(): Promise<EventRow[]> {
   return unwrap(
-    await db().from("events").select("id, position, name, kind, points").order("position"),
+    await db().from("events").select("id, position, name, description, points").order("position"),
   );
 }
 
-export async function getTeams(eventId?: string): Promise<TeamRow[]> {
-  let query = db().from("event_teams").select("event_id, team, place");
+/** Every heat's places, for one game or all of them. */
+export async function getHeatResults(eventId?: string): Promise<ScoringResult[]> {
+  let query = db().from("heat_results").select("event_id, heat, team, place");
   if (eventId) query = query.eq("event_id", eventId);
   return unwrap(await query);
 }
 
-export async function getMembers(): Promise<MemberRow[]> {
+export async function getMembers(): Promise<ScoringMember[]> {
   // Explicit range: PostgREST caps responses at 1000 rows by default.
   return unwrap(
-    await db().from("event_members").select("event_id, player_id, team, role").range(0, 9999),
+    await db().from("event_members").select("event_id, player_id, team").range(0, 9999),
   );
 }
 
-export async function getPlayers(): Promise<PlayerRow[]> {
+export async function getPlayers(): Promise<ScoringPlayer[]> {
   return unwrap(await db().from("players").select("id, name"));
 }
 
-/** Competitor names for an event, keyed by team. */
-export async function getCompetitors(eventId: string): Promise<Partial<Record<TeamKey, string>>> {
+/** Who competes for each team in each heat of a game. */
+export async function getHeatCompetitors(
+  eventId: string,
+): Promise<{ heat: number; team: TeamKey; name: string }[]> {
   const rows = unwrap(
     await db()
       .from("event_members")
-      .select("team, players(name)")
+      .select("heat, team, players(name)")
       .eq("event_id", eventId)
       .eq("role", "competitor"),
-  ) as unknown as { team: TeamKey; players: { name: string } | null }[];
-  return Object.fromEntries(rows.map((r) => [r.team, r.players?.name ?? ""]));
+  ) as unknown as { heat: number; team: TeamKey; players: { name: string } | null }[];
+  return rows.map((r) => ({ heat: r.heat, team: r.team, name: r.players?.name ?? "" }));
 }
 
-export async function setPlace(eventId: string, team: TeamKey, place: number | null) {
+export async function setPlace(eventId: string, heat: number, team: TeamKey, place: number | null) {
   const updated = unwrap(
     await db()
-      .from("event_teams")
+      .from("heat_results")
       .update({ place })
       .eq("event_id", eventId)
+      .eq("heat", heat)
       .eq("team", team)
       .select("team"),
   );
-  if (updated.length !== 1) throw new Error(`No ${team} team found for this event`);
+  if (updated.length !== 1) throw new Error(`No ${team} team in heat ${heat} of this game`);
 }

@@ -1,6 +1,6 @@
 import { Form } from "react-router";
-import { getEvents, getMembers, getPlayers, getTeams } from "~/lib/data.server";
-import { computeStandings } from "~/lib/scoring";
+import { getEvents, getHeatResults, getMembers, getPlayers } from "~/lib/data.server";
+import { computeStandings, eventsScored } from "~/lib/scoring";
 import { requireOfficial } from "~/lib/session.server";
 import type { Route } from "./+types/leaderboard";
 
@@ -8,18 +8,15 @@ export const meta: Route.MetaFunction = () => [{ title: "Leaderboard · Party Sc
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireOfficial(request);
-  const [players, events, teams, members] = await Promise.all([
+  const [players, events, results, members] = await Promise.all([
     getPlayers(),
     getEvents(),
-    getTeams(),
+    getHeatResults(),
     getMembers(),
   ]);
-  const completed = events.filter((e) =>
-    teams.filter((t) => t.event_id === e.id).every((t) => t.place !== null),
-  ).length;
   return {
-    standings: computeStandings(players, events, teams, members),
-    completed,
+    standings: computeStandings(players, events, results, members),
+    completed: eventsScored(events, results),
     total: events.length,
   };
 }
@@ -31,7 +28,7 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
       <header className="text-center">
         <h1 className="text-2xl font-bold">Leaderboard</h1>
         <p className="text-sm text-gray-500">
-          {completed} of {total} events scored
+          {completed} of {total} games scored
         </p>
       </header>
 

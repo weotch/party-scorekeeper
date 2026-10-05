@@ -1,4 +1,4 @@
-import { BONUS_TEAMS, STANDARD_TEAMS, type Role, type TeamKey } from "./scoring";
+import { TEAMS, type Role, type TeamKey } from "./scoring";
 
 export type Rng = () => number;
 
@@ -27,53 +27,53 @@ export function shuffle<T>(items: readonly T[], rng: Rng): T[] {
   return out;
 }
 
+/** The people competing for each color in one heat. */
+export type HeatLineup = Record<TeamKey, string[]>;
+
 export interface Assignment {
   player: string;
   team: TeamKey;
   role: Role;
+  /** The heat a competitor plays in. Supporters have none. */
+  heat: number | null;
 }
 
 /**
- * Deal `players` across `teams` as evenly as possible: each player goes to a
- * random team among the currently smallest, so sizes differ by at most 1.
+ * Assigns everyone to a color for one game. Competitors keep the colors and
+ * heats they were given (heat numbers start at 1 in the order given). Everyone
+ * else is dealt as a supporter to a random team among the currently smallest,
+ * counting competitors, so total team sizes differ by at most 1.
  */
-function deal(
+export function dealEvent(
   players: readonly string[],
-  teams: readonly TeamKey[],
+  heats: readonly HeatLineup[],
   rng: Rng,
 ): Assignment[] {
-  const sizes = new Map(teams.map((t) => [t, 0]));
-  return shuffle(players, rng).map((player) => {
-    const smallest = Math.min(...sizes.values());
-    const candidates = teams.filter((t) => sizes.get(t) === smallest);
-    const team = candidates[Math.floor(rng() * candidates.length)];
-    sizes.set(team, smallest + 1);
-    return { player, team, role: "supporter" as const };
-  });
-}
-
-/** Standard event: each color gets its competitor, everyone else is dealt as a supporter. */
-export function dealStandard(
-  players: readonly string[],
-  competitors: Record<(typeof STANDARD_TEAMS)[number], string>,
-  rng: Rng,
-): Assignment[] {
-  const competing = new Set(Object.values(competitors));
-  const assignments: Assignment[] = STANDARD_TEAMS.map((team) => ({
-    player: competitors[team],
-    team,
-    role: "competitor",
-  }));
-  return assignments.concat(
-    deal(
-      players.filter((p) => !competing.has(p)),
-      STANDARD_TEAMS,
-      rng,
+  const competitors: Assignment[] = heats.flatMap((lineup, i) =>
+    TEAMS.flatMap((team) =>
+      lineup[team].map((player) => ({
+        player,
+        team,
+        role: "competitor" as const,
+        heat: i + 1,
+      })),
     ),
   );
-}
+  const competing = new Set(competitors.map((a) => a.player));
+  const sizes = new Map<TeamKey, number>(
+    TEAMS.map((t) => [t, competitors.filter((a) => a.team === t).length]),
+  );
 
-/** Bonus event: everyone is split between Team A and Team B. */
-export function dealBonus(players: readonly string[], rng: Rng): Assignment[] {
-  return deal(players, BONUS_TEAMS, rng);
+  const supporters = shuffle(
+    players.filter((p) => !competing.has(p)),
+    rng,
+  ).map((player) => {
+    const smallest = Math.min(...sizes.values());
+    const candidates = TEAMS.filter((t) => sizes.get(t) === smallest);
+    const team = candidates[Math.floor(rng() * candidates.length)];
+    sizes.set(team, smallest + 1);
+    return { player, team, role: "supporter" as const, heat: null };
+  });
+
+  return [...competitors, ...supporters];
 }

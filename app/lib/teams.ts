@@ -19,8 +19,6 @@ export const TEAM_STYLES: Record<
     selected: "bg-green-600 text-white",
     ring: "border-green-600",
   },
-  a: { label: "Team A", swatch: "bg-gray-900 dark:bg-gray-100", selected: "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-950", ring: "border-gray-900 dark:border-gray-100" },
-  b: { label: "Team B", swatch: "bg-gray-500", selected: "bg-gray-500 text-white", ring: "border-gray-500" },
 };
 
 export function ordinal(n: number): string {

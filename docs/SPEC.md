@@ -1,269 +1,137 @@
-# Party Scorekeeper: Project Spec
+# Party Scorekeeper: Spec
 
-A mobile-first web app that officials (2 to 3 people) use to run scoring for a
-series of birthday party games on **October 11, 2026**. Guests never use the
-app; they see their team assignments on printed sheets.
-
-Status: **Draft**. Open questions are listed at the end.
-
----
+A mobile-first web app that 2 to 3 officials use to keep score for the party
+games on **October 11, 2026**. Guests never use the app; they see their team
+assignments on printed sheets.
 
 ## 1. How the party works
 
-- About **20 to 30 players**.
-- About **12 standard events** plus **1 or 2 bonus events** at the end, run in a
-  fixed order that's decided ahead of time.
-- Standard events use 4 team colors, fixed for the whole party: **Red,
-  Yellow, Blue, Green**. Colored props match them.
-- Every player belongs to exactly one team in every event. No one sits out.
+- About **20 to 30 players** and about **12 games**, run in a fixed order. The
+  order can change freely until the sheets are printed.
+- There are four team colors, fixed for the whole party: **Red, Yellow, Blue,
+  Green**. Colored props match them.
+- Every player is on exactly one color in every game. Nobody sits out.
 
-### Standard events (4 teams)
+### A game
 
-- Each color team has one **competitor**, so 4 competitors per event.
-- Every other player is a **supporter** on one of the 4 teams. Supporters are
-  spread as evenly as possible (for example, 26 players means 22 supporters, so
-  team sizes of 6/6/5/5 including the competitor).
-- Points by place: **1st = 5, 2nd = 3, 3rd = 2, 4th = 1**.
-- Every member of a team (competitor and supporters) gets that team's points.
+- A game has one or more **heats**. In a heat, the four colors compete and are
+  ranked 1st to 4th. Balloon Bobble runs 2 heats.
+- Each color fields one or more people in a heat. Usually that is one person;
+  Hot Potato Tag fields 3 per color in a single heat, and Balloon Hustle fields
+  a pre-assigned pair per color. A competitor plays in exactly one heat of a
+  game.
+- Everyone who isn't competing is a **supporter**. Supporters are dealt to a
+  color in advance, as evenly as possible (counting the competitors), and the
+  assignments are printed.
 
-### Bonus events (2 teams)
+### Scoring
 
-- The whole group is randomly split into **Team A** and **Team B** as evenly
-  as possible (assigned in advance, like supporters). No colors and no
-  designated competitor.
-- The winning team's members each get **5 points**. The losing team gets 0.
-
-### Ties within an event
-
-- Officials can give two or more teams the same place.
-- Places below a tie **move up** (dense ranking). There are no gaps; the last
-  places just disappear. The official picks those places by hand (the app
-  doesn't renumber anything), and points always come straight from the place
-  that was picked.
-  - Two tied for 1st: places 1, 1, 2, 3, so points 5, 5, 3, 2.
-  - Two tied for 2nd: places 1, 2, 2, 3, so points 5, 3, 3, 2.
-
-### Winning
-
-- Each player's total is the sum of their points from every event, whether
-  they earned them as a competitor or a supporter.
-- Highest total wins. Overall ties are settled outside the app. The app just
-  shows tied players at the same rank.
+- Each heat pays by place: **1st = 5, 2nd = 3, 3rd = 2, 4th = 1**.
+- A team's score for a game is the **sum of its points across the game's
+  heats**. Everyone on that color for that game gets it: competitors from any
+  heat and every supporter.
+- A one-heat game pays at most 5 per person and a two-heat game at most 10.
+  That is intentional: a game with more heats counts for more.
+- A pair or a group of three on a team is not worth extra. If the team wins,
+  everyone on it gets the same points.
+- **Ties:** officials can give two teams the same place, and places below a tie
+  move up (1st, 1st, 2nd, 3rd pay 5, 5, 3, 2). The app doesn't renumber
+  anything; points come straight from the place that was picked.
+- **Winning:** highest total wins. Overall ties are settled outside the app;
+  the leaderboard shows tied players at the same rank.
+- How elimination games (such as Hot Potato Tag) turn into four team places is
+  up to the officials. The app only records the final order of the four teams.
 
 ### Out of scope
 
-- Tracking who's physically present (everyone is treated as present).
-- Guest-facing views, guest logins, or guests using phones.
-- Running more than one party (designed for this party only).
-- Randomizing assignments live. Assignments are generated and stored ahead of
-  time so the printed sheets always match the app.
-- Printing. The organizer makes the printed sheets outside the app.
-- Showing supporters in the app. They're on the printed sheets.
-
----
+- Team A vs Team B bonus games (dropped).
+- Tracking who is physically present (everyone is treated as present).
+- Guest-facing views or logins.
+- More than one party.
+- Randomizing assignments live, or printing the sheets.
 
 ## 2. Data model (Supabase / Postgres)
 
-All party configuration lives in the database. Nothing about players, events,
-or assignments is hardcoded.
+The schema is in `supabase/migrations/`. In short:
 
-```sql
--- Team keys: 4 colors for standard events, A/B for bonus events
-create type team_key as enum ('red', 'yellow', 'blue', 'green', 'a', 'b');
+| Table | Holds |
+| --- | --- |
+| `players` | name |
+| `events` | `position` (running order), `name`, `description`, `points` (per heat, default `{5,3,2,1}`) |
+| `event_teams` | the four colors for each game |
+| `heats` | heat numbers for each game |
+| `heat_results` | one row per color per heat, with its `place` (null until entered) |
+| `event_members` | each player's color in each game, their `role`, and for competitors their `heat` |
 
-create table players (
-  id         uuid primary key default gen_random_uuid(),
-  name       text not null unique,
-  created_at timestamptz not null default now()
-);
+- Points aren't stored. They are derived from `events.points[place]` and summed
+  over heats, so correcting a result fixes every total.
+- A game is **scored** when every `heat_results` row has a place.
+- A check constraint requires competitors to have a heat and supporters to have
+  none. A player can be in a game only once (primary key on `event_id,
+  player_id`).
+- Row Level Security is on with no policies. The app reads and writes from the
+  server with the secret key, so the public keys can't touch the data.
 
-create table events (
-  id         uuid primary key default gen_random_uuid(),
-  position   int  not null unique,          -- run order: 1, 2, 3...
-  name       text not null,
-  kind       text not null check (kind in ('standard', 'bonus')),
-  -- points[1] = points for 1st place, points[2] = 2nd, etc.
-  -- standard: {5,3,2,1}, bonus: {5,0}
-  points     int[] not null,
-  created_at timestamptz not null default now()
-);
+## 3. Party data (CSV import)
 
--- One row per team in an event. Holds the result.
--- Standard events use red/yellow/blue/green, bonus events use a/b.
-create table event_teams (
-  event_id uuid not null references events(id) on delete cascade,
-  team     team_key   not null,
-  place    int check (place >= 1),          -- null until results are entered
-  primary key (event_id, team)
-);
+Assignments are generated once and printed, so setup is a deterministic script
+rather than an app feature. Three files in `data/`:
 
--- One row per player per event: which team they're on and their role.
-create table event_members (
-  event_id  uuid not null,
-  player_id uuid not null references players(id) on delete cascade,
-  team      team_key   not null,
-  role      text not null check (role in ('competitor', 'supporter')),
-  primary key (event_id, player_id),        -- a player is on exactly one team per event
-  foreign key (event_id, team) references event_teams(event_id, team) on delete cascade
-);
+- `players.csv`: `name`
+- `events.csv`: `position,name,description`
+- `heats.csv`: `event,heat,red,yellow,blue,green`. One row per heat. Each color
+  cell holds one or more names separated by `;`. Heats refer to a game by
+  **name**, so reordering `events.csv` is safe.
 
--- At most one competitor per team
-create unique index one_competitor_per_team
-  on event_members (event_id, team) where role = 'competitor';
-```
+`npm run import` validates the files and stops on typos, then deals supporters
+and writes `data/import.sql`. It checks that:
 
-Notes:
+- Every name exists, and nobody competes twice in a game.
+- Every heat has at least one competitor for each color, and heat numbers run
+  1, 2, 3 with none missing.
+- Every game has at least one heat, and game names and positions are unique.
+- (Warnings only) a heat has uneven teams or more than 3 people on a color.
 
-- **Event status is derived.** An event is complete when every team has a
-  place. No separate status column to keep in sync.
-- **Points aren't stored.** They're derived as `events.points[place]` (0 if
-  out of range). Correcting a result automatically fixes every player's total.
-- **Bonus events** have 2 `event_teams` rows (`a` and `b`) and no competitor
-  members.
-- Scoring math lives in one place: a pure, unit-tested TypeScript function.
-  With about 30 players and 14 events the whole dataset is a few hundred rows,
-  so loaders fetch the raw rows and compute totals in code.
-
-### Data validation
-
-A setup check (run by the import script) reports:
-
-- A player missing from an event, or listed twice.
-- A standard event without exactly 4 color teams and 4 competitors.
-- A bonus event without exactly teams A and B.
-- Team sizes that differ by more than 1 within an event.
-- Results with gaps in the places (for example 1, 3, 4). Shown as a gentle
-  warning in the app rather than blocking anything, since results are saved
-  one tap at a time.
-
----
-
-## 3. Seeding the party data
-
-Since assignments are generated once and printed, seeding is a **one-time,
-deterministic** script, not an app feature.
-
-**Inputs** (CSV files in `data/`, imported by a script):
-
-- `players.csv`: one name per row.
-- `events.csv`: position, name, kind, and for standard events the competitor
-  for each color.
-
-**Script** (`scripts/seed.ts`):
-
-1. Upserts players and events.
-2. For each standard event, puts the 4 competitors on their colors, then
-   shuffles the remaining players and deals them round-robin across the 4
-   colors (as even as possible).
-3. For each bonus event, shuffles everyone and splits them into Team A and
-   Team B.
-4. Uses a **fixed random seed** so a rerun produces the same assignments.
-5. **Refuses to overwrite** existing assignments unless passed `--force`, so
-   the printed sheets can't drift from the database by accident.
-6. Runs the setup check at the end.
-
-Nice to have: when dealing supporters, avoid putting the same person on the
-same competitor's team over and over, so the mix of teammates changes.
-
----
+Dealing is seeded, and **each game is dealt from its own seed** (the seed plus
+the game's name). Reordering games or editing one game's lineup never changes
+another game's teams. The script refuses to replace existing data without
+`--force`, so printed sheets can't drift from the database by accident. Its
+summary shows team sizes and how many games each player competes in.
 
 ## 4. Screens
 
-Mobile-first with big tap targets. Two views, switched with a toggle that's
-always visible (for example a bottom tab bar), plus a login screen.
+Mobile-first with big tap targets. A bottom tab bar switches between the event
+screen and the leaderboard.
 
-| Route | Purpose |
-| --- | --- |
-| `/login` | Shared password entry. |
-| `/events/:position` | **Event view (main screen).** Steps through events in order with previous/next controls. `/` redirects to the first event that doesn't have full results yet. |
-| `/leaderboard` | **Leaderboard.** All players ranked by total points, with ties sharing a rank. |
+- **`/login`**: the shared password.
+- **`/events/:position`**: the main screen. Arrows step through the games, and
+  `/` opens the first heat that still needs a result.
+  - Shows the game's name and description.
+  - Games with 2+ heats show a heat switcher (a check mark marks finished
+    heats). The heat is kept in the URL (`?heat=2`) so finishing one heat
+    doesn't move the screen. Switching heats is instant.
+  - Each color has a card listing its competitors for that heat (one to three
+    names) and a button for each place.
+  - **Tapping a place saves immediately.** Tapping another place changes it, and
+    tapping the selected place clears it. Two teams can share a place.
+  - **Optimistic updates:** the button highlights at once and, if the save
+    fails (including a dropped connection), snaps back with a short message.
+  - A gentle warning appears if a place is skipped (for example 1st, 1st, 3rd).
+  - Multi-heat games show each color's running total for the game.
+- **`/leaderboard`**: every player ranked by total, ties sharing a rank, plus how
+  many games are fully scored.
 
-### Event view
+With several officials on separate phones, data refreshes when the app regains
+focus and every 15 seconds while visible.
 
-- Header: event number, name, and previous/next arrows.
-- Standard event: 4 rows, one per color (Red, Yellow, Blue, Green), each
-  showing the color and that event's competitor.
-- Bonus event: 2 rows, Team A and Team B.
-- Each row has a button for every place: 1st to 4th for standard events, 1st
-  and 2nd for bonus events. The selected place is highlighted.
-- **Tapping a place saves it right away.** There's no confirm step.
-  - Tapping a different place on the same row changes it.
-  - Tapping the selected place again clears it.
-  - Two rows can pick the same place (ties).
-- **Optimistic updates.** The button highlights right away while the save
-  runs in the background. If the save fails, the row snaps back to its
-  previous value and a short error message appears.
-- If the places have a gap (for example 1, 1, 3), a small warning appears.
-  It never blocks anything.
+## 5. Tech stack and security
 
-### Leaderboard
-
-- Rank, name, and total points, sorted highest first.
-- Ties share a rank (for example 1, 2, 2, 4).
-- Possible addition: tap a player to see per-event points. Not required.
-
-### Keeping officials in sync
-
-With 2 or 3 officials on separate phones, data refreshes when a screen
-regains focus and every 15 seconds while it's visible (React Router
-revalidation).
-
----
-
-## 5. Tech stack
-
-- **React Router v7, framework mode** (SSR with loaders and actions),
-  TypeScript.
-- **Vercel** hosting via the `@vercel/react-router` preset.
-- **Supabase** Postgres, with migrations in `supabase/migrations` (Supabase
-  CLI) and `@supabase/ssr` for server-side access.
-- **Tailwind CSS** for styling.
-- **Vitest** for unit tests on scoring, tie handling, and assignment dealing.
-- Optimistic updates use React Router's `useFetcher`: while a save is in
-  flight the UI shows the submitted value, and when it settles the loader
-  data (the real database state) takes over. A failed save rolls back on its
-  own.
-
-### Auth and security
-
-Kept deliberately small:
-
-- One **shared password**, stored as a Vercel environment variable.
-- `/login` checks it in a React Router action and sets a signed, HTTP-only
-  session cookie (`createCookieSessionStorage`). Every other route's loader
-  and action checks for that cookie and redirects to `/login` if it's
-  missing. This is roughly 30 lines of code.
-- The app only talks to Supabase from the server, using the Supabase secret
-  key. Row Level Security is turned on with no policies, so the public
-  (anon) key can't read or write anything.
-- Why not Google sign-in: Supabase supports it, but it means setting up a
-  Google Cloud OAuth client, redirect URLs, and an allowlist check. That's
-  more setup and code than a shared password for 3 trusted people. Vercel's
-  built-in password protection is a paid add-on.
-
----
-
-## 6. Build plan
-
-Target: feature complete with time for a dry run before October 11.
-
-1. **Foundation.** Scaffold React Router + Tailwind, write the Supabase
-   migration, set up Vercel deploys with environment variables. Add the
-   scoring module and its tests.
-2. **CSV import.** CSV format, import script with seeded shuffle, setup
-   check. Load placeholder data.
-3. **Event view.** Event stepping, place buttons with optimistic saves and
-   rollback, gap warning.
-4. **Leaderboard and auth.** Leaderboard view, tab toggle, shared password
-   login.
-5. **Polish.** Refresh on focus (Realtime if time allows), error states,
-   testing on real phones.
-6. **Real data and dry run.** Import the real roster and schedule, and run a
-   mock party with the officials.
-
----
-
-## 7. Open questions
-
-1. **Accounts.** The Supabase and Vercel projects still need to be created
-   and connected.
+- **React Router 7** framework mode (v8 isn't supported by Vercel's preset yet),
+  TypeScript, Tailwind 4.
+- **Vercel** via `@vercel/react-router`, with functions in `sfo1` next to the
+  database.
+- **Supabase** Postgres, with migrations in `supabase/migrations`.
+- **Vitest** for the scoring, dealing, CSV, and import logic.
+- Auth is one shared password (`APP_PASSWORD`, a Vercel environment variable)
+  and a signed, HTTP-only session cookie. Every protected loader and action
+  checks it.

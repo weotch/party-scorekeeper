@@ -1,6 +1,28 @@
-import { data, Link, useFetcher, useFetchers } from "react-router";
-import { getCompetitors, getEvents, getTeams, setPlace } from "~/lib/data.server";
-import { hasPlaceGap, pointsForPlace, teamsForKind, type TeamKey } from "~/lib/scoring";
+import {
+  data,
+  Link,
+  redirect,
+  useFetcher,
+  useFetchers,
+  useSearchParams,
+} from "react-router";
+import {
+  getEvents,
+  getHeatCompetitors,
+  getHeatResults,
+  setPlace,
+} from "~/lib/data.server";
+import {
+  buildHeats,
+  gameTotals,
+  hasPlaceGap,
+  isHeatComplete,
+  nextHeatToScore,
+  pointsForPlace,
+  TEAMS,
+  type TeamKey,
+} from "~/lib/scoring";
+import { skipOnSearchOnlyChange } from "~/lib/revalidate";
 import { requireOfficial } from "~/lib/session.server";
 import { ordinal, TEAM_STYLES } from "~/lib/teams";
 import type { Route } from "./+types/event";
@@ -16,40 +38,50 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   if (index === -1) throw data("Event not found", { status: 404 });
   const event = events[index];
 
-  const [teams, competitors] = await Promise.all([getTeams(event.id), getCompetitors(event.id)]);
-  const places = Object.fromEntries(teams.map((t) => [t.team, t.place]));
+  const [results, competitors] = await Promise.all([
+    getHeatResults(event.id),
+    getHeatCompetitors(event.id),
+  ]);
+  const heats = buildHeats(results, competitors);
+  if (heats.length === 0) throw new Error(`${event.name} has no heats. Re-run the import.`);
+
+  // Pin the heat in the URL for multi-heat games, so finishing one heat doesn't
+  // make the screen jump to the next.
+  const requested = Number(new URL(request.url).searchParams.get("heat"));
+  if (heats.length > 1 && !heats.some((h) => h.number === requested)) {
+    throw redirect(`/events/${event.position}?heat=${nextHeatToScore(heats)}`);
+  }
 
   return {
-    event,
+    event: { id: event.id, name: event.name, description: event.description, points: event.points },
     number: index + 1,
     total: events.length,
     prev: events[index - 1]?.position ?? null,
     next: events[index + 1]?.position ?? null,
-    rows: teamsForKind(event.kind).map((team) => ({
-      team,
-      competitor: competitors[team] ?? null,
-      place: places[team] ?? null,
-    })),
+    heats,
   };
 }
+
+/** Switching heats only changes the query string, and the loader already returned every heat. */
+export const shouldRevalidate = skipOnSearchOnlyChange;
 
 export async function action({ request, params }: Route.ActionArgs) {
   await requireOfficial(request);
   const form = await request.formData();
-  const events = await getEvents();
-  const event = events.find((e) => e.position === Number(params.position));
-  if (!event) return data({ error: "Event not found" }, { status: 404 });
-
-  const teams = teamsForKind(event.kind);
   const team = String(form.get("team")) as TeamKey;
+  const heat = Number(form.get("heat"));
   const rawPlace = String(form.get("place") ?? "");
   const place = rawPlace === "" ? null : Number(rawPlace);
-  if (!teams.includes(team) || (place !== null && !(place >= 1 && place <= teams.length))) {
+  const validPlace = place === null || (Number.isInteger(place) && place >= 1 && place <= TEAMS.length);
+  if (!TEAMS.includes(team) || !Number.isInteger(heat) || heat < 1 || !validPlace) {
     return data({ error: "Invalid place" }, { status: 400 });
   }
 
+  const event = (await getEvents()).find((e) => e.position === Number(params.position));
+  if (!event) return data({ error: "Event not found" }, { status: 404 });
+
   try {
-    await setPlace(event.id, team, place);
+    await setPlace(event.id, heat, team, place);
   } catch (error) {
     console.error(error);
     return data({ error: "Couldn't save. Try again." }, { status: 500 });
@@ -70,52 +102,92 @@ export async function clientAction({ serverAction }: Route.ClientActionArgs) {
   }
 }
 
-const fetcherKey = (eventId: string, team: TeamKey) => `place:${eventId}:${team}`;
+const fetcherKey = (eventId: string, heat: number, team: TeamKey) =>
+  `place:${eventId}:${heat}:${team}`;
 
 export default function EventPage({ loaderData }: Route.ComponentProps) {
-  const { event, number, total, prev, next, rows } = loaderData;
+  const { event, number, total, prev, next } = loaderData;
+  const [searchParams] = useSearchParams();
 
   // Optimistic places: an in-flight save wins over the last loaded value. When
   // the save settles, the reloaded data takes over, so a failed save rolls back.
-  const pending = new Map(
-    useFetchers()
-      .filter((f) => f.formData && f.key.startsWith(`place:${event.id}:`))
-      .map((f) => [f.formData!.get("team") as TeamKey, f.formData!.get("place") as string]),
-  );
-  const shownRows = rows.map((row) => {
-    const p = pending.get(row.team);
-    return { ...row, place: p === undefined ? row.place : p === "" ? null : Number(p) };
-  });
-  const gap = hasPlaceGap(shownRows.map((r) => r.place));
+  const pending = new Map<string, string>();
+  for (const f of useFetchers()) {
+    if (f.formData && f.key.startsWith(`place:${event.id}:`)) {
+      pending.set(`${f.formData.get("heat")}:${f.formData.get("team")}`, String(f.formData.get("place")));
+    }
+  }
+  const heats = loaderData.heats.map((heat) => ({
+    ...heat,
+    places: Object.fromEntries(
+      TEAMS.map((team) => {
+        const p = pending.get(`${heat.number}:${team}`);
+        return [team, p === undefined ? heat.places[team] : p === "" ? null : Number(p)];
+      }),
+    ) as Record<TeamKey, number | null>,
+  }));
+
+  const requested = Number(searchParams.get("heat"));
+  const current = heats.find((h) => h.number === requested) ?? heats[0];
+  const gap = hasPlaceGap(TEAMS.map((t) => current.places[t]));
+  const totals = gameTotals(event.points, heats);
 
   return (
     <main className="flex flex-col gap-4 pt-4">
       <header className="flex items-center gap-2">
-        <NavArrow to={prev} label="Previous event" direction="prev" />
+        <NavArrow to={prev} label="Previous game" direction="prev" />
         <div className="flex-1 text-center">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-            Event {number} of {total}
-            {event.kind === "bonus" && " · Bonus"}
+            Game {number} of {total}
           </p>
           <h1 className="text-2xl font-bold leading-tight">{event.name}</h1>
         </div>
-        <NavArrow to={next} label="Next event" direction="next" />
+        <NavArrow to={next} label="Next game" direction="next" />
       </header>
 
-      {event.kind === "bonus" && (
-        <p className="text-center text-sm text-gray-500">Everyone on the winning team gets 5 points.</p>
+      {event.description && (
+        <p className="text-center text-sm text-gray-500">{event.description}</p>
+      )}
+
+      {heats.length > 1 && (
+        <nav
+          aria-label="Heats"
+          className="grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${heats.length}, minmax(0, 1fr))` }}
+        >
+          {heats.map((heat) => {
+            const active = heat.number === current.number;
+            return (
+              <Link
+                key={heat.number}
+                to={{ search: `?heat=${heat.number}` }}
+                replace
+                preventScrollReset
+                aria-current={active ? "true" : undefined}
+                className={`rounded-lg py-3 text-center text-base font-semibold ${
+                  active
+                    ? "bg-gray-900 text-white dark:bg-white dark:text-gray-950"
+                    : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+                }`}
+              >
+                Heat {heat.number}
+                {isHeatComplete(heat) && <span aria-label="complete"> ✓</span>}
+              </Link>
+            );
+          })}
+        </nav>
       )}
 
       <ul className="flex flex-col gap-3">
-        {shownRows.map((row) => (
+        {TEAMS.map((team) => (
           <TeamRow
-            key={row.team}
+            key={`${event.id}:${current.number}:${team}`}
             eventId={event.id}
-            team={row.team}
-            competitor={row.competitor}
-            place={row.place}
-            placeCount={rows.length}
-            points={pointsForPlace(event.points, row.place)}
+            heat={current.number}
+            team={team}
+            competitors={current.competitors[team]}
+            place={current.places[team]}
+            points={pointsForPlace(event.points, current.places[team])}
           />
         ))}
       </ul>
@@ -126,26 +198,46 @@ export default function EventPage({ loaderData }: Route.ComponentProps) {
           (for example 1st, 1st, 2nd).
         </p>
       )}
+
+      {heats.length > 1 && (
+        <section
+          aria-label="Game total"
+          className="rounded-xl bg-gray-100 px-4 py-3 dark:bg-gray-900"
+        >
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            Game total across heats
+          </p>
+          <ul className="mt-2 grid grid-cols-4 gap-2">
+            {TEAMS.map((team) => (
+              <li key={team} className="flex items-center justify-center gap-2">
+                <span className={`h-3 w-3 rounded-full ${TEAM_STYLES[team].swatch}`} aria-hidden />
+                <span className="sr-only">{TEAM_STYLES[team].label}</span>
+                <span className="text-lg font-bold tabular-nums">{totals[team]}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   );
 }
 
 function TeamRow({
   eventId,
+  heat,
   team,
-  competitor,
+  competitors,
   place,
-  placeCount,
   points,
 }: {
   eventId: string;
+  heat: number;
   team: TeamKey;
-  competitor: string | null;
+  competitors: string[];
   place: number | null;
-  placeCount: number;
   points: number;
 }) {
-  const fetcher = useFetcher<typeof clientAction>({ key: fetcherKey(eventId, team) });
+  const fetcher = useFetcher<typeof clientAction>({ key: fetcherKey(eventId, heat, team) });
   const style = TEAM_STYLES[team];
   const error = fetcher.state === "idle" ? fetcher.data?.error : undefined;
 
@@ -154,9 +246,9 @@ function TeamRow({
       <div className="mb-3 flex items-center gap-3">
         <span className={`h-8 w-8 shrink-0 rounded-full ${style.swatch}`} aria-hidden />
         <div className="min-w-0 flex-1">
-          {competitor ? (
+          {competitors.length > 0 ? (
             <>
-              <p className="truncate text-lg font-semibold leading-tight">{competitor}</p>
+              <p className="text-lg font-semibold leading-tight">{competitors.join(", ")}</p>
               <p className="text-xs text-gray-500">{style.label}</p>
             </>
           ) : (
@@ -170,8 +262,8 @@ function TeamRow({
         )}
       </div>
 
-      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${placeCount}, minmax(0, 1fr))` }}>
-        {Array.from({ length: placeCount }, (_, i) => i + 1).map((n) => {
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${TEAMS.length}, minmax(0, 1fr))` }}>
+        {TEAMS.map((_, i) => i + 1).map((n) => {
           const selected = place === n;
           return (
             <button
@@ -181,7 +273,7 @@ function TeamRow({
               onClick={() =>
                 fetcher.submit(
                   // Tapping the selected place again clears it
-                  { team, place: selected ? "" : String(n) },
+                  { team, heat: String(heat), place: selected ? "" : String(n) },
                   { method: "post" },
                 )
               }
