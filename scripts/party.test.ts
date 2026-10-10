@@ -49,11 +49,20 @@ describe("buildParty", () => {
     expect(bobble(swapped)).toEqual(bobble(first));
   });
 
-  it("changing one game's lineup leaves other games alone", () => {
+  it("editing one game's lineup never moves competitors in other games", () => {
     const first = build().party!;
     const edited = build({ heatsCsv: heatsCsv.replace("P1,P2,P3,P4", "P4,P3,P2,P1") }).party!;
-    expect(edited.assignments.get(1)).not.toEqual(first.assignments.get(1));
-    expect(edited.assignments.get(2)).toEqual(first.assignments.get(2));
+    const competitors = (p: typeof first, position: number) =>
+      p.assignments.get(position)!.filter((a) => a.role === "competitor");
+    expect(competitors(edited, 1)).not.toEqual(competitors(first, 1));
+    expect(competitors(edited, 2)).toEqual(competitors(first, 2));
+  });
+
+  it("never makes a competitor a supporter in their own game", () => {
+    for (const dealt of build().party!.assignments.values()) {
+      const competing = new Set(dealt.filter((a) => a.role === "competitor").map((a) => a.player));
+      expect(dealt.filter((a) => a.role === "supporter" && competing.has(a.player))).toEqual([]);
+    }
   });
 
   it("warns about uneven teams without failing", () => {

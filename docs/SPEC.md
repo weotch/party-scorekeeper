@@ -94,9 +94,14 @@ and writes `data/import.sql`. It checks that:
   and game names and positions are unique.
 - (Warning only) a heat has uneven teams.
 
-Dealing is seeded, and **each game is dealt from its own seed** (the seed plus
-the game's name). Reordering games or editing one game's lineup never changes
-another game's teams. The script refuses to replace existing data without
+Dealing is seeded. Each game's supporters are dealt at random, then **mixed
+across games**: supporters swap colors within a game whenever that lowers how
+often the same two people end up together, so teams keep changing (with the
+real lineups, no pair shares a color in more than 6 of 12 games, and most share
+2 or 3). Supporters stay one color for the whole game (all heats) and never
+include that game's competitors. Reordering games doesn't change the teams;
+editing a lineup can reshuffle supporters in other games, so finish lineups
+before printing. The script refuses to replace existing data without
 `--force`, so printed sheets can't drift from the database by accident. Its
 summary shows team sizes and how many games each player competes in.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRng, dealEvent, type Assignment, type HeatLineup } from "./assign";
+import { createRng, dealEvent, mixTeams, type Assignment, type HeatLineup } from "./assign";
 import { TEAMS } from "./scoring";
 
 const players = Array.from({ length: 26 }, (_, i) => `P${i + 1}`);
@@ -75,5 +75,59 @@ describe("dealEvent", () => {
     const dealt = dealEvent(players, heats, createRng("test"));
     expect(dealEvent(players, heats, createRng("test"))).toEqual(dealt);
     expect(dealEvent(players, heats, createRng("other"))).not.toEqual(dealt);
+  });
+});
+
+describe("mixTeams", () => {
+  const roster = Array.from({ length: 30 }, (_, i) => `P${i + 1}`);
+  const pick = (g: number, k: number) => roster[(g * 4 + k) % roster.length];
+  // 12 one-heat games, one competitor per color, rotating through the roster
+  const games = Array.from({ length: 12 }, (_, g) =>
+    dealEvent(roster, [lineup([pick(g, 0)], [pick(g, 1)], [pick(g, 2)], [pick(g, 3)])], createRng(`g${g}`)),
+  );
+
+  /** How many games each pair spends on the same color. */
+  const pairStats = (all: Assignment[][]) => {
+    const together = new Map<string, number>();
+    for (const game of all) {
+      for (const a of game) {
+        for (const b of game) {
+          if (a.player < b.player && a.team === b.team) {
+            together.set(`${a.player}|${b.player}`, (together.get(`${a.player}|${b.player}`) ?? 0) + 1);
+          }
+        }
+      }
+    }
+    const counts = [...together.values()];
+    return { max: Math.max(...counts), sumSq: counts.reduce((s, c) => s + c * c, 0) };
+  };
+
+  const mixed = mixTeams(games, createRng("mix"));
+
+  it("keeps everyone once per game, competitors in place, and team sizes the same", () => {
+    mixed.forEach((game, g) => {
+      expect(game.map((a) => a.player).sort()).toEqual([...roster].sort());
+      const competitors = (x: Assignment[]) => x.filter((a) => a.role === "competitor");
+      expect(competitors(game)).toEqual(competitors(games[g]));
+      expect(game.filter((a) => a.role === "supporter").every((a) => a.heat === null)).toBe(true);
+      expect(sizes(game)).toEqual(sizes(games[g]));
+    });
+  });
+
+  it("spreads repeat pairings across games", () => {
+    const before = pairStats(games);
+    const after = pairStats(mixed);
+    expect(after.sumSq).toBeLessThan(before.sumSq);
+    expect(after.max).toBeLessThanOrEqual(before.max);
+  });
+
+  it("is deterministic for a seed", () => {
+    expect(mixTeams(games, createRng("mix"))).toEqual(mixed);
+  });
+
+  it("does not modify its input", () => {
+    const copy = JSON.parse(JSON.stringify(games));
+    mixTeams(games, createRng("other"));
+    expect(games).toEqual(copy);
   });
 });

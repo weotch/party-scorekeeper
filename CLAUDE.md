@@ -35,7 +35,8 @@ CI runs typecheck, tests, and build on every PR.
 - `app/lib/revalidate.ts`: skips loader reloads when only `?search` changes (heat tabs switch instantly).
 - `app/routes/event.tsx`: main screen. Place buttons save on tap via per-team fetchers (`place:<eventId>:<heat>:<team>`); the optimistic state comes from `useFetchers()`. `clientAction` turns network failures into a row error so the row rolls back. Multi-heat games pin `?heat=` in the URL via a loader redirect.
 - `app/routes/leaderboard.tsx`, `app/routes/home.tsx` (redirects to the first heat without a result), `app/routes/app-layout.tsx` (tab bar, refresh on focus and every 15s).
-- `scripts/party.ts`: reads and validates the CSVs and deals every game (shared by `import.ts` and `fake-db.ts`). Each game is dealt from its own seed (seed + game name), so editing or reordering one game doesn't change the others.
+- `scripts/party.ts`: reads and validates the CSVs and deals every game (shared by `import.ts` and `fake-db.ts`). Each game is dealt at random, then `mixTeams` (`app/lib/assign.ts`) swaps supporters within games to spread repeat pairings across games. Deterministic for a seed; reordering games doesn't change the teams, but editing a lineup can reshuffle supporters in other games.
+- The real roster is **not** committed (the repo is public). `data/` holds placeholder players; the organizer keeps the real CSVs. To regenerate real SQL, put their CSVs in a scratch folder's `data/` and run `npx --prefix <repo> tsx <repo>/scripts/import.ts` from that folder.
 - `supabase/migrations/`: schema. Points aren't stored; they come from `events.points[place]`.
 
 ## Workflow
