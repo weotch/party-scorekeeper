@@ -77,3 +77,92 @@ export function dealEvent(
 
   return [...competitors, ...supporters];
 }
+
+/**
+ * Spreads repeat pairings across games. Within each game, swaps supporters
+ * between colors whenever that lowers how often the same two people share a
+ * color across all games (it minimizes the sum of squared "games together"
+ * counts). Competitors never move, team sizes never change, and supporters stay
+ * one color per game. The rng only orders the search, so results are
+ * deterministic for a seed.
+ */
+export function mixTeams(games: readonly Assignment[][], rng: Rng, maxRounds = 50): Assignment[][] {
+  const players = [...new Set(games.flat().map((a) => a.player))];
+  const index = new Map(players.map((p, i) => [p, i]));
+  const n = players.length;
+  const together = new Int32Array(n * n);
+  const add = (a: number, b: number, d: number) => {
+    together[a * n + b] += d;
+    together[b * n + a] += d;
+  };
+
+  // Current members of each color in each game, as player indexes
+  const teams = games.map((game) => {
+    const byTeam = new Map<TeamKey, number[]>(TEAMS.map((t) => [t, []]));
+    for (const a of game) byTeam.get(a.team)!.push(index.get(a.player)!);
+    return byTeam;
+  });
+  for (const byTeam of teams) {
+    for (const members of byTeam.values()) {
+      for (let i = 0; i < members.length; i++) {
+        for (let j = i + 1; j < members.length; j++) add(members[i], members[j], 1);
+      }
+    }
+  }
+  const teamOf = teams.map((byTeam) => {
+    const m = new Map<number, TeamKey>();
+    for (const [team, members] of byTeam) for (const p of members) m.set(p, team);
+    return m;
+  });
+  const supporters = games.map((game) =>
+    game.filter((a) => a.role === "supporter").map((a) => index.get(a.player)!),
+  );
+
+  // Change in the objective if x (on team A) and y (on team B) trade places
+  const swapDelta = (A: number[], B: number[], x: number, y: number) => {
+    let delta = 0;
+    for (const m of A) {
+      if (m === x) continue;
+      delta += -2 * together[x * n + m] + 1 + 2 * together[y * n + m] + 1;
+    }
+    for (const m of B) {
+      if (m === y) continue;
+      delta += -2 * together[y * n + m] + 1 + 2 * together[x * n + m] + 1;
+    }
+    return delta;
+  };
+
+  for (let round = 0; round < maxRounds; round++) {
+    let improved = false;
+    for (let g = 0; g < games.length; g++) {
+      for (const x of shuffle(supporters[g], rng)) {
+        const teamX = teamOf[g].get(x)!;
+        const A = teams[g].get(teamX)!;
+        let best = { delta: 0, y: -1 };
+        for (const y of supporters[g]) {
+          const teamY = teamOf[g].get(y)!;
+          if (teamY === teamX) continue;
+          const delta = swapDelta(A, teams[g].get(teamY)!, x, y);
+          if (delta < best.delta) best = { delta, y };
+        }
+        if (best.y === -1) continue;
+
+        const y = best.y;
+        const teamY = teamOf[g].get(y)!;
+        const B = teams[g].get(teamY)!;
+        for (const m of A) if (m !== x) { add(x, m, -1); add(y, m, 1); }
+        for (const m of B) if (m !== y) { add(y, m, -1); add(x, m, 1); }
+        A[A.indexOf(x)] = y;
+        B[B.indexOf(y)] = x;
+        teamOf[g].set(x, teamY);
+        teamOf[g].set(y, teamX);
+        improved = true;
+      }
+    }
+    if (!improved) break;
+  }
+
+  return games.map((game, g) =>
+    game.map((a) => ({ ...a, team: teamOf[g].get(index.get(a.player)!)! })),
+  );
+}

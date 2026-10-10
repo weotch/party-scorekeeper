@@ -1,4 +1,4 @@
-import { createRng, dealEvent, type Assignment, type HeatLineup } from "../app/lib/assign";
+import { createRng, dealEvent, mixTeams, type Assignment, type HeatLineup } from "../app/lib/assign";
 import { TEAMS } from "../app/lib/scoring";
 import { parseCsv } from "./csv";
 
@@ -34,9 +34,11 @@ export interface PartyInput {
 const MAX_PER_TEAM = 3;
 
 /**
- * Validates the three CSVs and deals supporters. Each game is dealt with its
- * own random stream (seeded from the seed and the game's name), so reordering
- * games or changing one game's lineup never changes another game's teams.
+ * Validates the three CSVs and deals supporters: at random for each game, then
+ * mixed across games so the same people rarely share a color twice. The result
+ * is deterministic for a seed, and reordering games doesn't change it. Editing
+ * a lineup can reshuffle supporters in other games, so finish lineups before
+ * printing sheets.
  */
 export function buildParty({ playersCsv, eventsCsv, heatsCsv, seed }: PartyInput): PartyResult {
   const errors: string[] = [];
@@ -143,8 +145,13 @@ export function buildParty({ playersCsv, eventsCsv, heatsCsv, seed }: PartyInput
   if (errors.length) return { party: null, errors, warnings };
 
   const events = [...eventsByName.values()].sort((a, b) => a.position - b.position);
-  const assignments = new Map(
-    events.map((e) => [e.position, dealEvent(players, e.heats, createRng(`${seed}:${e.name}`))]),
-  );
+
+  // Deal each game at random, then swap supporters to spread repeat pairings
+  // across games. Games are mixed in name order, so the running order never
+  // affects who ends up together.
+  const byName = [...events].sort((a, b) => a.name.localeCompare(b.name));
+  const dealt = byName.map((e) => dealEvent(players, e.heats, createRng(`${seed}:${e.name}`)));
+  const mixed = mixTeams(dealt, createRng(`${seed}:mix`));
+  const assignments = new Map(byName.map((e, i) => [e.position, mixed[i]]));
   return { party: { players, events, assignments }, errors, warnings };
 }
