@@ -1,11 +1,5 @@
 import type { TeamKey } from "./scoring";
 
-/**
- * The order teams appear on screen, matching the printed sheets. Display only:
- * `TEAMS` keeps its order because dealing depends on it.
- */
-export const DISPLAY_TEAMS: readonly TeamKey[] = ["red", "yellow", "green", "blue"];
-
 /** Display name and Tailwind classes for each team. Kept as full class strings so Tailwind can see them. */
 export const TEAM_STYLES: Record<
   TeamKey,
