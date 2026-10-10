@@ -24,7 +24,7 @@ import {
 } from "~/lib/scoring";
 import { skipOnSearchOnlyChange } from "~/lib/revalidate";
 import { requireOfficial } from "~/lib/session.server";
-import { ordinal, TEAM_STYLES } from "~/lib/teams";
+import { DISPLAY_TEAMS, ordinal, TEAM_STYLES } from "~/lib/teams";
 import type { Route } from "./+types/event";
 
 export const meta: Route.MetaFunction = ({ data }) => [
@@ -179,7 +179,7 @@ export default function EventPage({ loaderData }: Route.ComponentProps) {
       )}
 
       <ul className="flex flex-col gap-3">
-        {TEAMS.map((team) => (
+        {DISPLAY_TEAMS.map((team) => (
           <TeamRow
             key={`${event.id}:${current.number}:${team}`}
             eventId={event.id}
@@ -208,7 +208,7 @@ export default function EventPage({ loaderData }: Route.ComponentProps) {
             Game total across heats
           </p>
           <ul className="mt-2 grid grid-cols-4 gap-2">
-            {TEAMS.map((team) => (
+            {DISPLAY_TEAMS.map((team) => (
               <li key={team} className="flex items-center justify-center gap-2">
                 <span className={`h-3 w-3 rounded-full ${TEAM_STYLES[team].swatch}`} aria-hidden />
                 <span className="sr-only">{TEAM_STYLES[team].label}</span>

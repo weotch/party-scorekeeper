@@ -63,7 +63,7 @@ insert into events (position, name, description, points) values
   (2, 'Tallest Tower', 'Stack foam blocks as high as you can in the allotted time.', '{5,3,2,1}'),
   (3, 'Speed Mölkky', 'Think cornhole mixed with bowling plus an umlaut.', '{5,3,2,1}'),
   (4, 'Card Ninja', 'Embed playing cards into a halved watermelon with the power of your wrist.', '{5,3,2,1}'),
-  (5, 'Balloon Hustle', 'Choose a partner and then be the first to cross the finish line while holding a balloon between your foreheads.', '{5,3,2,1}'),
+  (5, 'Balloon Hustle', 'Be the first to the finish line while holding a balloon between your foreheads.', '{5,3,2,1}'),
   (6, 'Hidden Labyrinth', 'Complete a maze (on paper) with the fewest wall collisions.', '{5,3,2,1}'),
   (7, 'Dizzy Dash', 'Spin round and round and then sprint through several checkpoints.', '{5,3,2,1}'),
   (8, 'Try Not to Laugh', 'Don''t spit water out of your mouth while listening to ridiculous audio tracks.', '{5,3,2,1}'),
