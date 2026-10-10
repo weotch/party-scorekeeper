@@ -48,7 +48,7 @@ CI runs typecheck, tests, and build on every PR.
 
 ## Supabase connector gotcha
 
-The Supabase MCP tools (`apply_migration`, `execute_sql`) hang for 60 seconds and time out on any statement containing `DROP`, `DELETE`, or `TRUNCATE`, even a no-op like `drop table if exists nothing`. It looks like destructive statements wait for a user confirmation that never arrives. Reads, `CREATE`, `ALTER`, and `INSERT` work. For anything destructive (including `npm run import -- --force`), write the SQL to a file and have the user paste it into the Supabase SQL editor, then verify afterwards with read-only queries. A timed-out call may not have applied: check the state before retrying.
+The Supabase MCP tools (`apply_migration`, `execute_sql`) hang for 60 seconds and time out on any statement containing `DROP`, `DELETE`, or `TRUNCATE`, even a no-op like `drop table if exists nothing`. It looks like destructive statements wait for a user confirmation that never arrives. An `UPDATE` with no `WHERE` clause hangs the same way; adding a `WHERE` (even `where position between 1 and 100`) lets it run. Reads, `CREATE`, `ALTER`, `INSERT`, and scoped `UPDATE`s work. For anything destructive (including `npm run import -- --force`), write the SQL to a file and have the user paste it into the Supabase SQL editor, then verify afterwards with read-only queries. A timed-out call may not have applied: check the state before retrying.
 
 ## IDs
 
